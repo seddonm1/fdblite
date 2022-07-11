@@ -620,6 +620,40 @@ mod tests {
 
     #[tokio::test]
     #[serial]
+    async fn test_example() {
+        let client = Client::connect(["localhost:2379"], None).await.unwrap();
+        client
+            .transact(|tr| async move {
+                let range = CompleteRange {};
+                tr.clear_range(&range).await;
+
+                tr.set("a", "a").await;
+                tr.set("b", "b").await;
+
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let (c, _) = client
+            .transact(|tr| async move {
+                // Read two values from the database
+                let a = tr.get("a").await?.unwrap();
+                let b = tr.get("b").await?.unwrap();
+                // Write two key-value pairs to the database
+                tr.set("c", [a.value(), b.value()].concat()).await;
+                tr.set("d", [a.value(), b.value()].concat()).await;
+
+                Ok(tr.get("c").await?.unwrap())
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(c.0.value, &[97, 98]);
+    }
+
+    #[tokio::test]
+    #[serial]
     async fn test_put_conflict() {
         let client = Client::connect(["localhost:2379"], None).await.unwrap();
         client
